@@ -1,19 +1,12 @@
 cmake_minimum_required(VERSION 3.4)
 project(panda_force)
 
-# SET(BUILD_TESTS OFF CACHE BOOL "Build tests")
-# SET(BUILD_EXAMPLES OFF CACHE BOOL "Build example code")
-# SET(BUILD_DOCUMENTATION OFF CACHE BOOL "Build documentation")
-# add_subdirectory(libfranka)
-
-# find_dependency(Poco REQUIRED COMPONENTS Net Foundation)
-# find_dependency(Eigen3 REQUIRED)
-
-# set(THREADS_PREFER_PTHREAD_FLAG ON)
-# find_dependency(Threads REQUIRED)
-
-find_package(Franka REQUIRED)
-
+find_package(Franka REQUIRED) 
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 
 add_executable(echo_robot_state experiments/echo_robot_state.cpp)
 target_link_libraries(echo_robot_state Franka::Franka)
+
+add_executable(force_control experiments/force_control.cpp libfranka/examples/examples_common.cpp)
+target_include_directories(force_control PRIVATE libfranka/examples)
+target_link_libraries(force_control Franka::Franka Eigen3::Eigen)

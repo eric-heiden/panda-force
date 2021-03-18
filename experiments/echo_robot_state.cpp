@@ -94,7 +94,7 @@ int main(int argc, char **argv)
       std::this_thread::sleep_for(50ms);
     }
 
-    std::ofstream file("log.json");
+    std::ofstream file("log_panda_nop.json");
     file << log;
 
     std::cout << "Done." << std::endl;
