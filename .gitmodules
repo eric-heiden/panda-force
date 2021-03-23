@@ -1,3 +1,6 @@
 [submodule "libfranka"]
 	path = libfranka
 	url = https://github.com/frankaemika/libfranka.git
+[submodule "FrankaEmikaPandaDynModel"]
+	path = FrankaEmikaPandaDynModel
+	url = https://github.com/eric-heiden/FrankaEmikaPandaDynModel.git
