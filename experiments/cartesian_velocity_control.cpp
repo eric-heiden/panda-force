@@ -23,16 +23,16 @@ int main(int argc, char **argv)
   //     std::cerr << "Usage: " << argv[0] << " <robot-hostname>" << std::endl;
   //     return -1;
   // }
-  std::atomic_bool running{true};
   std::string franka_address = "172.16.0.2";
   franka::Robot robot(franka_address);
   setDefaultBehavior(robot);
 
-  const double print_rate = 10.0;
-
   franka::Model model = robot.loadModel();
 
   StateRecorder state_recorder("log_panda_cartesian_velocity.json", model);
+
+  const double print_rate = 10.0;
+  std::atomic_bool running{true};
 
   struct
   {
@@ -42,6 +42,7 @@ int main(int argc, char **argv)
     franka::RobotState robot_state;
     std::array<double, 7> gravity;
   } print_data{};
+
   std::thread print_thread([print_rate, &print_data, &running, &state_recorder]() {
     while (running)
     {
@@ -104,7 +105,7 @@ int main(int argc, char **argv)
     double angle = M_PI / 4.0;
     double time = 0.0;
     robot.control([=, &time, &print_data, &running](const franka::RobotState &state,
-                                          franka::Duration period) -> franka::CartesianVelocities {
+                                                    franka::Duration period) -> franka::CartesianVelocities {
       time += period.toSec();
 
       if (print_data.mutex.try_lock())

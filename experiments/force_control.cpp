@@ -1,7 +1,8 @@
-// Copyright (c) 2017 Franka Emika GmbH
-// Use of this source code is governed by the Apache-2.0 license, see LICENSE
 #include <array>
 #include <iostream>
+#include <atomic>
+#include <mutex>
+#include <thread>
 
 #include <Eigen/Core>
 
@@ -11,6 +12,7 @@
 #include <franka/robot.h>
 
 #include "examples_common.h"
+#include "state_recorder.hpp"
 
 /**
  * @example force_control.cpp
@@ -24,20 +26,56 @@
 int main(int argc, char **argv)
 {
     std::string franka_address = "172.16.0.2";
+    // connect to robot
+    franka::Robot robot(franka_address);
+    setDefaultBehavior(robot);
+    // load the kinematics and dynamics model
+    franka::Model model = robot.loadModel();
+
     // parameters
     double desired_mass{0.0};
-    constexpr double target_mass{0.2};   // NOLINT(readability-identifier-naming)
+    constexpr double target_mass{0.3};   // NOLINT(readability-identifier-naming)
     constexpr double k_p{1.0};           // NOLINT(readability-identifier-naming)
     constexpr double k_i{2.0};           // NOLINT(readability-identifier-naming)
     constexpr double filter_gain{0.001}; // NOLINT(readability-identifier-naming)
+    StateRecorder state_recorder("log_panda_force_control_" + std::to_string(target_mass) + "kg.json", model);
+    state_recorder.save_every_nth_update = 20;
+
+    const double print_rate = 10.0;
+    std::atomic_bool running{true};
+
+    struct
+    {
+        std::mutex mutex;
+        bool has_data;
+        std::array<double, 7> tau_d_last;
+        franka::RobotState robot_state;
+        std::array<double, 7> gravity;
+    } print_data{};
+
+    std::thread print_thread([print_rate, &print_data, &running, &state_recorder]() {
+        while (running)
+        {
+            // Sleep to achieve the desired print rate.
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(static_cast<int>((1.0 / print_rate * 1000.0))));
+
+            // Try to lock data to avoid read write collisions.
+            if (print_data.mutex.try_lock())
+            {
+                if (print_data.has_data)
+                {
+                    state_recorder(print_data.robot_state);
+                    print_data.has_data = false;
+                }
+                print_data.mutex.unlock();
+            }
+        }
+        state_recorder.save();
+    });
 
     try
     {
-        // connect to robot
-        franka::Robot robot(franka_address);
-        setDefaultBehavior(robot);
-        // load the kinematics and dynamics model
-        franka::Model model = robot.loadModel();
 
         // set collision behavior
         robot.setCollisionBehavior({{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
@@ -67,6 +105,15 @@ int main(int argc, char **argv)
         auto force_control_callback = [&](const franka::RobotState &robot_state,
                                           franka::Duration period) -> franka::Torques {
             time += period.toSec();
+
+            if (print_data.mutex.try_lock())
+            {
+                print_data.has_data = true;
+                print_data.robot_state = robot_state;
+                // print_data.tau_d_last = tau_d_rate_limited;
+                // print_data.gravity = model.gravity(state);
+                print_data.mutex.unlock();
+            }
 
             if (time == 0.0)
             {
@@ -112,10 +159,17 @@ int main(int argc, char **argv)
         // start real-time control loop
         robot.control(force_control_callback);
     }
-    catch (const std::exception &ex)
+    catch (const std::exception &e)
     {
-        // print exception
-        std::cout << ex.what() << std::endl;
+        running = false;
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
     }
-    return 0;
+    running = false;
+    if (print_thread.joinable())
+    {
+        print_thread.join();
+    }
+
+    return EXIT_SUCCESS;
 }

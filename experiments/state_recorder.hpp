@@ -24,6 +24,8 @@ struct StateRecorder
 
     bool print_to_stdout{false};
 
+    int save_every_nth_update{0};
+
     nlohmann::json log;
 
     StateRecorder(const std::string &filename,
@@ -60,6 +62,8 @@ struct StateRecorder
     bool operator()(const franka::RobotState &robot_state)
     {
         static auto t0 = Time::now();
+        static int counter = 0;
+
         std::array<double, 7> gravity_array = model.gravity(robot_state);
         std::array<double, 7> coriolis_array = model.coriolis(robot_state);
         std::array<double, 42> jacobian_array =
@@ -127,6 +131,12 @@ struct StateRecorder
             // print(robot_state.O_F_ext_hat_K);
 
             std::cout << std::endl;
+        }
+
+        ++counter;
+        if (save_every_nth_update > 0 && counter % save_every_nth_update == 0)
+        {
+            save();
         }
 
         return continuous_recording;

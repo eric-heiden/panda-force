@@ -9,7 +9,7 @@ target_link_libraries(echo_robot_state Franka::Franka Eigen3::Eigen)
 
 add_executable(force_control experiments/force_control.cpp libfranka/examples/examples_common.cpp)
 target_include_directories(force_control PRIVATE libfranka/examples)
-target_link_libraries(force_control Franka::Franka Eigen3::Eigen)
+target_link_libraries(force_control Franka::Franka Eigen3::Eigen Threads::Threads)
 
 add_executable(cartesian_velocity_control experiments/cartesian_velocity_control.cpp libfranka/examples/examples_common.cpp)
 target_include_directories(cartesian_velocity_control PRIVATE libfranka/examples)
