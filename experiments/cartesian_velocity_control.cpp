@@ -121,8 +121,9 @@ int main(int argc, char **argv)
       double v = cycle * v_max / 2.0 * (1.0 - std::cos(2.0 * M_PI / time_max * time));
       double v_x = std::cos(angle) * v;
       double v_z = -std::sin(angle) * v;
+      std::cout << "v_z:  " << v_z << "\n";
 
-      franka::CartesianVelocities output = {{v_x, 0.0, v_z, 0.0, 0.0, 0.0}};
+      franka::CartesianVelocities output = {{0.0, 0.0, v_z, 0.0, 0.0, 0.0}};
       if (time >= 2 * time_max)
       {
         std::cout << std::endl
