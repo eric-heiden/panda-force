@@ -126,7 +126,7 @@ int main(int argc, char **argv)
 
             double v = v_z * (sinus_step(time, 0.2) + sinus_step(time_max - time, 0.2) - 1.0);
             // double v = -0.001;
-            std::cout << v << "\n";
+            // std::cout << v << "\n";
             franka::CartesianVelocities output = {{0.0, 0.0, v, 0.0, 0.0, 0.0}};
             if (time >= time_max)
             {
