@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 
     franka::Model model = robot.loadModel();
 
-    StateRecorder state_recorder("log_panda_cartesian_velocity.json", model);
+    StateRecorder state_recorder("log_panda_cut_vertical.json", model);
 
     const double print_rate = 10.0;
     std::atomic_bool running{true};
@@ -65,13 +65,20 @@ int main(int argc, char **argv)
         }
         state_recorder.save();
     });
+    // First move the robot to a suitable joint configuration
+    // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
+    std::array<double, 7> q_goal = {{0.000834242574274213,
+                                     0.2900282463107192,
+                                     0.0005799547732569646,
+                                     -2.937202012078804,
+                                     0.0035845843508754173,
+                                     3.226281019502349,
+                                     0.7825557258720371}};
 
     try
     {
 
-        // First move the robot to a suitable joint configuration
-        std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
-        MotionGenerator motion_generator(0.5, q_goal);
+        MotionGenerator motion_generator(0.2, q_goal);
         std::cout << "WARNING: This example will move the robot! "
                   << "Please make sure to have the user stop button at hand!" << std::endl
                   << "Press Enter to continue..." << std::endl;
@@ -102,7 +109,7 @@ int main(int argc, char **argv)
             lower_force_thresholds_acceleration, upper_force_thresholds_acceleration,
             lower_force_thresholds_nominal, upper_force_thresholds_nominal);
 
-        double time_max = 6.0;
+        double time_max = 6.1;
         double time = 0.0;
         const double v_z = -0.05;
         const double kappa = 2.0;
@@ -117,9 +124,10 @@ int main(int argc, char **argv)
                 print_data.mutex.unlock();
             }
 
-            double v = v_z * (sigmoid(time - 2.0, kappa) + sigmoid(-time + 4.0, kappa) - 1.0);
+            double v = v_z * (sinus_step(time, 0.2) + sinus_step(time_max - time, 0.2) - 1.0);
+            // double v = -0.001;
             std::cout << v << "\n";
-            franka::CartesianVelocities output = {{0.0, 0.0, v_z, 0.0, 0.0, 0.0}};
+            franka::CartesianVelocities output = {{0.0, 0.0, v, 0.0, 0.0, 0.0}};
             if (time >= time_max)
             {
                 std::cout << std::endl
@@ -136,6 +144,20 @@ int main(int argc, char **argv)
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;
     }
+
+    try
+    {
+        MotionGenerator motion_generator(0.2, q_goal);
+        std::cout << "Moving back to start configuration..." << std::endl;
+        robot.control(motion_generator);
+    }
+    catch (const franka::Exception &e)
+    {
+        running = false;
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
     if (print_thread.joinable())
     {
         print_thread.join();
