@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 
     franka::Model model = robot.loadModel();
 
-    StateRecorder state_recorder("log_panda_cut_vertical_nothing2.json", model);
+    StateRecorder state_recorder("log_panda_cut_vertical_potato.json", model);
 
     const double print_rate = 500.0;
     std::atomic_bool running{true};
