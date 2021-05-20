@@ -18,3 +18,7 @@ target_link_libraries(cartesian_velocity_control Franka::Franka Eigen3::Eigen Th
 add_executable(cut_vertical experiments/cut_vertical.cpp libfranka/examples/examples_common.cpp)
 target_include_directories(cut_vertical PRIVATE libfranka/examples)
 target_link_libraries(cut_vertical Franka::Franka Eigen3::Eigen Threads::Threads)
+
+add_executable(cut_vertical_edc experiments/cut_vertical_edc.cpp libfranka/examples/examples_common.cpp)
+target_include_directories(cut_vertical_edc PRIVATE libfranka/examples)
+target_link_libraries(cut_vertical_edc Franka::Franka Eigen3::Eigen Threads::Threads)
