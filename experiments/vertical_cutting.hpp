@@ -25,6 +25,14 @@ struct VerticalCutting
 
     std::array<double, 7> q_goal{{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
 
+    int save_state_every_nth_step{1};
+
+    /**
+     * Defines how fast the sinus step for the velocity profiles changes to the desired target velocity.
+     * The larger the kappa, the more abrupt is the change in velocity.
+     */
+    double kappa{1.0};
+
 private:
     bool initiated{false};
     struct
@@ -91,27 +99,40 @@ public:
             std::cin.ignore();
 
             double time = 0.0;
-            robot.control([=, &time](const franka::RobotState &state,
-                                     franka::Duration period) -> franka::CartesianVelocities {
+            int step = 0;
+            std::cout << "Allocating states array...\n";
+            state_recorder.states.resize(100000);
+            state_recorder.times.resize(100000);
+            robot.control([=, &time, &step](const franka::RobotState &state,
+                                            franka::Duration period) -> franka::CartesianVelocities {
                 time += period.toSec();
 
-                if (print_data.mutex.try_lock())
+                if (save_state_every_nth_step > 0 && step % save_state_every_nth_step == 0)
                 {
-                    print_data.has_data = true;
-                    print_data.robot_state = state;
-                    print_data.mutex.unlock();
-                    // if (std::abs(time - time_max / 2.0) < 0.05)
-                    // {
-                    //     std::cout << "Joint q:";
-                    //     for (size_t i = 0; i < state.q.size(); ++i)
-                    //     {
-                    //         std::cout << "  " << state.q[i];
-                    //     }
-                    //     std::cout << "\n";
-                    // }
+                    int index = step / save_state_every_nth_step;
+                    state_recorder.states[index] = state;
+                    state_recorder.times[index] = time;
+                    state_recorder.step = index;
                 }
 
-                double v = v_z * (sinus_step(time, 1.0)); // + sinus_step(time_max - time, 0.2) - 1.0);
+                ++step;
+                // if (print_data.mutex.try_lock())
+                // {
+                //     print_data.has_data = true;
+                //     print_data.robot_state = state;
+                //     print_data.mutex.unlock();
+                //     // if (std::abs(time - time_max / 2.0) < 0.05)
+                //     // {
+                //     //     std::cout << "Joint q:";
+                //     //     for (size_t i = 0; i < state.q.size(); ++i)
+                //     //     {
+                //     //         std::cout << "  " << state.q[i];
+                //     //     }
+                //     //     std::cout << "\n";
+                //     // }
+                // }
+
+                double v = v_z * (sinus_step(time, kappa)); // + sinus_step(time_max - time, 0.2) - 1.0);
                 // double v = -0.001;
                 // std::cout << v << "\n";
                 franka::CartesianVelocities output = {{0.0, 0.0, v, 0.0, 0.0, 0.0}};
@@ -129,13 +150,14 @@ public:
         catch (const franka::Exception &e)
         {
             running = false;
+            std::cerr << e.what() << std::endl;
+
             if (print_data.mutex.try_lock())
             {
                 print_data.has_data = true;
                 print_data.success = false;
                 print_data.mutex.unlock();
             }
-            std::cerr << e.what() << std::endl;
             if (print_thread.joinable())
             {
                 print_thread.join();

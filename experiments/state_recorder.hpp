@@ -30,6 +30,7 @@ struct StateRecorder
 
     std::vector<franka::RobotState> states;
     std::vector<double> times;
+    int step{0};
 
     StateRecorder(const std::string &filename,
                   const franka::Model &model) : filename(filename), model(model)
@@ -167,9 +168,11 @@ struct StateRecorder
 
     void save()
     {
+        states.resize(step);
+        times.resize(step);
         process();
         std::ofstream file(filename);
         file << log;
-        std::cout << "Saved log to " << filename << "\n";
+        std::cout << "Saved " << states.size() << " states to log file at " << filename << "\n";
     }
 };
