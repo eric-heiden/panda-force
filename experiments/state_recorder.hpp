@@ -30,6 +30,7 @@ struct StateRecorder {
   std::vector<franka::RobotState> states;
   std::vector<double> times;
   int step{0};
+  mutable int another_step{0};
 
   StateRecorder(const std::string &filename, const franka::Model &model,
                 size_t stack_size = 100000)
@@ -78,8 +79,11 @@ struct StateRecorder {
     // d.count() / 1e6;
     double time = robot_state.time.toSec() - t0;
     times.push_back(time);
-    if (counter % 100 == 0) {
-      std::cout << "time: " << time << "\n";
+    if (counter % 10 == 0) {
+      // std::cout << "time: " << time << "\n";
+      std::cout << "time: " << time << "  step: " << another_step
+                << "  counter: " << counter << "  StateRecorder: " << this
+                << "\n";
     }
 
     // if (print_to_stdout)
@@ -98,14 +102,30 @@ struct StateRecorder {
 
     //     std::cout << std::endl;
     // }
-
     ++counter;
+    this->another_step = counter;
 
     return continuous_recording;
   }
 
   void process() {
+    const int progress_bar_width = 64;
+
     for (size_t i = 0; i < states.size(); ++i) {
+      std::cout << "Saving " << states.size() << " states [";
+      double progress = double(i) / (states.size() - 1.0);
+      int pos = progress_bar_width * progress;
+      for (int i = 0; i < progress_bar_width; ++i) {
+        if (i < pos)
+          std::cout << "=";
+        else if (i == pos)
+          std::cout << ">";
+        else
+          std::cout << " ";
+      }
+      std::cout << "] " << int(progress * 100.0) << " %\r";
+      std::cout.flush();
+
       const auto &robot_state = states[i];
       double time = times[i];
 
@@ -170,13 +190,12 @@ struct StateRecorder {
       log["EE_twist"].push_back(
           {twist[0], twist[1], twist[2], twist[3], twist[4], twist[5]});
     }
+    std::cout << std::endl;
   }
 
   void save() {
-    std::cout << "Saving " << step << " states to log file at " << filename
-              << "\n";
-    states.resize(step);
-    times.resize(step);
+    // states.resize(step);
+    // times.resize(step);
     process();
     std::ofstream file(filename);
     file << log;

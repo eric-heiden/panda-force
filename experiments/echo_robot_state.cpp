@@ -4,6 +4,8 @@
 
 #include <fstream>
 
+#include <functional>
+
 #include <Eigen/Dense>
 
 #include <franka/exception.h>
@@ -40,10 +42,8 @@ int main(int argc, char **argv) {
     std::string franka_address = "172.16.0.2";
     franka::Robot robot(franka_address);
     settings::set_EE_properties(
-        robot,
-        std::string(PANDA_HOME) +
-            std::string(
-                "/edc-knife-endeffector-config.json"));
+        robot, std::string(PANDA_HOME) +
+                   std::string("/edc-knife-endeffector-config.json"));
 
     // load the kinematics and dynamics model
     franka::Model model = robot.loadModel();
@@ -54,9 +54,16 @@ int main(int argc, char **argv) {
     StateRecorder state_recorder("log_panda_nop.json", model);
     state_recorder.print_to_stdout = true;
 
-    for (int i = 0; i < 200; ++i) {
-      robot.read(state_recorder);
-      std::this_thread::sleep_for(50ms);
+    // auto recording_fn = std::bind(&StateRecorder::operator(), state_recorder,
+    // std::placeholders::_1);
+
+    for (int i = 0; i < 400; ++i) {
+      // robot.read(recording_fn);
+      robot.read([&state_recorder](const franka::RobotState &robot_state) {
+        state_recorder(robot_state);
+        return false;
+      });
+      std::this_thread::sleep_for(20ms);
     }
 
     state_recorder.save();
