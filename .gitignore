@@ -36,3 +36,4 @@
 build/
 .ipynb_checkpoints/
 .history/
+.cache/
