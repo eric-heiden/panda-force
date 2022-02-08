@@ -24,3 +24,15 @@ target_link_libraries(cut_vertical Franka::Franka Eigen3::Eigen Threads::Threads
 add_executable(cut_vertical_edc experiments/cut_vertical_edc.cpp libfranka/examples/examples_common.cpp)
 target_include_directories(cut_vertical_edc PRIVATE libfranka/examples)
 target_link_libraries(cut_vertical_edc Franka::Franka Eigen3::Eigen Threads::Threads)
+
+
+find_package(cppzmq)
+
+if (cppzmq_FOUND)
+  add_executable(zmq_control_server experiments/zmq_control_server.cpp libfranka/examples/examples_common.cpp)
+  target_compile_definitions(zmq_control_server PUBLIC -DUSE_ZMQ=1)
+  target_link_libraries(zmq_control_server PUBLIC ${cppzmq_LIBRARIES} zmq)
+  target_include_directories(zmq_control_server PUBLIC ${cppzmq_INCLUDE_DIRS})
+else()
+  target_compile_definitions(zmq_control_server PUBLIC -DUSE_ZMQ=0)
+endif ()
