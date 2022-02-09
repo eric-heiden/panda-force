@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.4)
 project(panda_force)
 
+set(CMAKE_CXX_STANDARD 17)
+
 add_definitions(-DPANDA_HOME="${CMAKE_CURRENT_LIST_DIR}")
 
 find_package(Franka REQUIRED) 
-find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 add_executable(echo_robot_state experiments/echo_robot_state.cpp)
 target_link_libraries(echo_robot_state Franka::Franka Eigen3::Eigen)
@@ -25,14 +27,13 @@ add_executable(cut_vertical_edc experiments/cut_vertical_edc.cpp libfranka/examp
 target_include_directories(cut_vertical_edc PRIVATE libfranka/examples)
 target_link_libraries(cut_vertical_edc Franka::Franka Eigen3::Eigen Threads::Threads)
 
-
 find_package(cppzmq)
 
 if (cppzmq_FOUND)
   add_executable(zmq_control_server experiments/zmq_control_server.cpp libfranka/examples/examples_common.cpp)
   target_compile_definitions(zmq_control_server PUBLIC -DUSE_ZMQ=1)
-  target_link_libraries(zmq_control_server PUBLIC ${cppzmq_LIBRARIES} zmq)
-  target_include_directories(zmq_control_server PUBLIC ${cppzmq_INCLUDE_DIRS})
+  target_link_libraries(zmq_control_server PUBLIC ${cppzmq_LIBRARIES} zmq Franka::Franka Eigen3::Eigen Threads::Threads)
+  target_include_directories(zmq_control_server PUBLIC ${cppzmq_INCLUDE_DIRS} libfranka/examples)
 else()
   target_compile_definitions(zmq_control_server PUBLIC -DUSE_ZMQ=0)
 endif ()

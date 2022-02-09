@@ -79,12 +79,11 @@ struct StateRecorder {
     // d.count() / 1e6;
     double time = robot_state.time.toSec() - t0;
     times.push_back(time);
-    if (counter % 10 == 0) {
-      // std::cout << "time: " << time << "\n";
-      std::cout << "time: " << time << "  step: " << another_step
-                << "  counter: " << counter << "  StateRecorder: " << this
-                << "\n";
-    }
+    // if (counter % 10 == 0) {
+    //   // std::cout << "time: " << time << "\n";
+    //   std::cout << "time: " << time << "  step: " << another_step << "
+    //   counter: " << counter << "  StateRecorder: " << this << "\n";
+    // }
 
     // if (print_to_stdout)
     // {
@@ -112,19 +111,21 @@ struct StateRecorder {
     const int progress_bar_width = 64;
 
     for (size_t i = 0; i < states.size(); ++i) {
-      std::cout << "Saving " << states.size() << " states [";
-      double progress = double(i) / (states.size() - 1.0);
-      int pos = progress_bar_width * progress;
-      for (int i = 0; i < progress_bar_width; ++i) {
-        if (i < pos)
-          std::cout << "=";
-        else if (i == pos)
-          std::cout << ">";
-        else
-          std::cout << " ";
+      if (states.size() > 5000) {
+        std::cout << "Saving " << states.size() << " states [";
+        double progress = double(i) / (states.size() - 1.0);
+        int pos = progress_bar_width * progress;
+        for (int i = 0; i < progress_bar_width; ++i) {
+          if (i < pos)
+            std::cout << "=";
+          else if (i == pos)
+            std::cout << ">";
+          else
+            std::cout << " ";
+        }
+        std::cout << "] " << int(progress * 100.0) << " %\r";
+        std::cout.flush();
       }
-      std::cout << "] " << int(progress * 100.0) << " %\r";
-      std::cout.flush();
 
       const auto &robot_state = states[i];
       double time = times[i];
