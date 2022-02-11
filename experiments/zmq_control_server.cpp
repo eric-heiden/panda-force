@@ -1,4 +1,3 @@
-#include <Eigen/Dense>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -8,11 +7,19 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
-#include <zmq.hpp>
+
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
+#include <Eigen/Dense>
 
 #include <franka/exception.h>
 #include <franka/model.h>
 #include <franka/robot.h>
+
+#include <zmq.hpp>
 
 #include "spline.hpp"
 
@@ -132,6 +139,12 @@ std::string uppercase(const std::string &s) {
   return r;
 }
 
+std::condition_variable cv;
+// char entered_value;
+void read_value() {
+  std::cin.ignore();
+  cv.notify_one();
+}
 void prompt_confirmation(const std::string &knife) {
   std::cout << "WARNING: The robot is about to move!\n\n";
   if (knife.empty()) {
@@ -142,8 +155,17 @@ void prompt_confirmation(const std::string &knife) {
   }
   std::cout << "Please make sure to have the user stop button at hand!"
             << std::endl
-            << "Press Enter to continue..." << std::endl;
-  std::cin.ignore();
+            << "You have 5 seconds to press Enter to continue, "
+            << "the server will terminate otherwise..." << std::endl;
+  // std::cin.ignore();
+  std::thread th(read_value);
+  std::mutex mtx;
+  std::unique_lock<std::mutex> lck(mtx);
+  while (cv.wait_for(lck, std::chrono::seconds(5)) == std::cv_status::timeout) {
+    std::cout << "Time out. Shutting down control server.\n";
+    std::exit(0);
+  }
+  th.join();
 }
 
 int main(int argc, char **argv) {
@@ -184,6 +206,13 @@ int main(int argc, char **argv) {
     } else if (command == "disconnect") {
       robot.reset();
       response = "OK";
+    } else if (command == "error_recovery") {
+      try {
+        robot->automaticErrorRecovery();
+        response = "OK";
+      } catch (const std::exception &e) {
+        response = e.what();
+      }
     } else if (command == "set_knife") {
       if (!robot) {
         // throw std::runtime_error("Robot has not been connected!");
@@ -330,8 +359,8 @@ int main(int argc, char **argv) {
     } else if (command == "interpolate") {
       int num_waypoints;
       ss >> num_waypoints;
-      if (num_waypoints < 2) {
-        response = "At least 2 waypoints must be specified!";
+      if (num_waypoints < 3) {
+        response = "At least 3 waypoints must be specified!";
         goto send_response;
       }
       std::array<std::vector<double>, 7> qs;
@@ -380,8 +409,8 @@ int main(int argc, char **argv) {
     } else if (command == "follow_qs") {
       int num_waypoints;
       ss >> num_waypoints;
-      if (num_waypoints < 2) {
-        response = "At least 2 waypoints must be specified!";
+      if (num_waypoints < 3) {
+        response = "At least 3 waypoints must be specified!";
         goto send_response;
       }
       std::array<std::vector<double>, 7> qs;
@@ -419,31 +448,109 @@ int main(int argc, char **argv) {
       }
       prompt_confirmation(knife_selection);
       std::string filename = std::string(PANDA_HOME) + "/log/" +
-                             get_time_str() + "_move_to_q.json";
+                             get_time_str() + "_follow_qs.json";
       filename = fs::absolute(fs::path(filename));
       StateRecorder state_recorder(filename, *model);
       int step = 0;
       std::array<double, 7> current_q;
       double current_time = 0.0;
       const double end_time = times.back();
-      robot->control([&splines, &state_recorder, &record_frequency, &step,
-                      &current_q, &current_time, &end_time](
-                         const franka::RobotState &robot_state,
-                         franka::Duration period) -> franka::JointPositions {
-        if (step % record_frequency == 0) {
-          state_recorder(robot_state);
-        }
-        ++step;
-        for (int i = 0; i < 7; ++i) {
-          current_q[i] = splines[i](current_time);
-        }
-        current_time += period.toSec();
-        franka::JointPositions output(current_q);
-        output.motion_finished = current_time > end_time;
-        return output;
-      });
-      state_recorder.save();
-      response = "OK " + filename;
+      try {
+        robot->control([&splines, &state_recorder, &record_frequency, &step,
+                        &current_q, &current_time, &end_time](
+                           const franka::RobotState &robot_state,
+                           franka::Duration period) -> franka::JointPositions {
+          if (step % record_frequency == 0) {
+            state_recorder(robot_state);
+          }
+          ++step;
+          for (int i = 0; i < 7; ++i) {
+            current_q[i] = splines[i](current_time);
+          }
+          current_time += period.toSec();
+          franka::JointPositions output(current_q);
+          output.motion_finished = current_time > end_time;
+          return output;
+        });
+        state_recorder.save();
+        response = "OK " + filename;
+      } catch (const std::exception &e) {
+        response =
+            "Error at time " + std::to_string(current_time) + ": " + e.what();
+      }
+    } else if (command == "follow_cartesian_vel") {
+      int num_waypoints;
+      ss >> num_waypoints;
+      if (num_waypoints < 2) {
+        response = "At least 2 waypoints must be specified!";
+        goto send_response;
+      }
+      std::array<std::vector<double>, 6> qs;
+      for (int i = 0; i < 6; ++i) {
+        qs[i].resize(num_waypoints);
+      }
+      for (int i = 0; i < 6 * num_waypoints; ++i) {
+        ss >> qs[i % 6][i / 6];
+      }
+      double source_dt;
+      ss >> source_dt;
+      if (source_dt <= 0.0) {
+        response = "Source timestep must be greater than zero!";
+        goto send_response;
+      }
+      int record_frequency;
+      ss >> record_frequency;
+      if (record_frequency <= 0) {
+        response = "Record frequency must be greater than zero!";
+        goto send_response;
+      }
+
+      std::vector<double> times(num_waypoints);
+      for (int i = 0; i < num_waypoints; ++i) {
+        times[i] = source_dt * i;
+      }
+      std::vector<tk::spline> splines;
+      tk::spline::spline_type type = tk::spline::cspline;
+      bool make_monotonic = false;
+      for (int i = 0; i < 6; ++i) {
+        // set first derivative boundaries to zero
+        splines.push_back(tk::spline(times, qs[i], type, make_monotonic,
+                                     tk::spline::first_deriv, 0.0,
+                                     tk::spline::first_deriv, 0.0));
+      }
+      prompt_confirmation(knife_selection);
+      std::string filename = std::string(PANDA_HOME) + "/log/" +
+                             get_time_str() + "_follow_cartesian_vel.json";
+      filename = fs::absolute(fs::path(filename));
+      StateRecorder state_recorder(filename, *model);
+      int step = 0;
+      std::array<double, 6> current_vel;
+      double current_time = 0.0;
+      const double end_time = times.back();
+      try {
+        robot->control(
+            [&splines, &state_recorder, &record_frequency, &step, &current_vel,
+             &current_time, &end_time](
+                const franka::RobotState &robot_state,
+                franka::Duration period) -> franka::CartesianVelocities {
+              if (step % record_frequency == 0) {
+                state_recorder(robot_state);
+              }
+              ++step;
+              for (int i = 0; i < 6; ++i) {
+                current_vel[i] = splines[i](current_time);
+              }
+              current_time += period.toSec();
+              franka::CartesianVelocities output(current_vel);
+              output.motion_finished = current_time > end_time;
+              return output;
+            });
+        state_recorder.save();
+        response = "OK " + filename;
+      } catch (const std::exception &e) {
+        response =
+            "Error at time " + std::to_string(current_time) + ": " + e.what();
+      }
     } else {
       response = "!Unknown command \"" + command + "\"";
     }
