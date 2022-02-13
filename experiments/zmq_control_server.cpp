@@ -474,9 +474,11 @@ int main(int argc, char **argv) {
         });
         state_recorder.save();
         response = "OK " + filename;
+        std::cout << "Completed joint position motion.\n";
       } catch (const std::exception &e) {
-        response =
-            "Error at time " + std::to_string(current_time) + ": " + e.what();
+        state_recorder.save();
+        response = "FAIL " + filename + " Error at time " +
+                   std::to_string(current_time) + ": " + e.what();
       }
     } else if (command == "follow_cartesian_vel") {
       int num_waypoints;
@@ -547,9 +549,11 @@ int main(int argc, char **argv) {
             });
         state_recorder.save();
         response = "OK " + filename;
+        std::cout << "Completed Cartesian velocity motion.\n";
       } catch (const std::exception &e) {
-        response =
-            "Error at time " + std::to_string(current_time) + ": " + e.what();
+        state_recorder.save();
+        response = "FAIL " + filename + " Error at time " +
+                   std::to_string(current_time) + ": " + e.what();
       }
     } else {
       response = "!Unknown command \"" + command + "\"";
