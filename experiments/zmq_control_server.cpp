@@ -31,6 +31,7 @@ using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
 const int progress_bar_width = 64;
+const int control_timeout_secs = 30;
 
 static inline std::string serialize(double d) {
   std::stringstream ss;
@@ -155,13 +156,15 @@ void prompt_confirmation(const std::string &knife) {
   }
   std::cout << "Please make sure to have the user stop button at hand!"
             << std::endl
-            << "You have 5 seconds to press Enter to continue, "
+            << "You have " << control_timeout_secs
+            << " seconds to press Enter to continue, "
             << "the server will terminate otherwise..." << std::endl;
   // std::cin.ignore();
   std::thread th(read_value);
   std::mutex mtx;
   std::unique_lock<std::mutex> lck(mtx);
-  while (cv.wait_for(lck, std::chrono::seconds(5)) == std::cv_status::timeout) {
+  while (cv.wait_for(lck, std::chrono::seconds(control_timeout_secs)) ==
+         std::cv_status::timeout) {
     std::cout << "Time out. Shutting down control server.\n";
     std::exit(0);
   }
@@ -243,6 +246,44 @@ int main(int argc, char **argv) {
         response = "No knife has been selected.";
       } else {
         response = "OK " + knife_selection;
+      }
+    } else if (command == "set_joint_impedance") {
+      if (!robot) {
+        // throw std::runtime_error("Robot has not been connected!");
+        response = "Robot has not been connected!";
+        goto send_response;
+      }
+      std::array<double, 7> kq;
+      ss >> kq;
+      try {
+        robot->setJointImpedance(kq);
+        response = "OK";
+      } catch (const std::exception &ex) {
+        response = ex.what();
+        std::cerr << "Error: " << ex.what() << std::endl;
+      }
+    } else if (command == "set_collision_behavior") {
+      if (!robot) {
+        // throw std::runtime_error("Robot has not been connected!");
+        response = "Robot has not been connected!";
+        goto send_response;
+      }
+      std::array<double, 7> lower_torque_thresholds;
+      std::array<double, 7> upper_torque_thresholds;
+      std::array<double, 6> lower_force_thresholds;
+      std::array<double, 6> upper_force_thresholds;
+      ss >> lower_torque_thresholds;
+      ss >> upper_torque_thresholds;
+      ss >> lower_force_thresholds;
+      ss >> upper_force_thresholds;
+      try {
+        robot->setCollisionBehavior(
+            lower_torque_thresholds, upper_torque_thresholds,
+            lower_force_thresholds, upper_force_thresholds);
+        response = "OK";
+      } catch (const std::exception &ex) {
+        response = ex.what();
+        std::cerr << "Error: " << ex.what() << std::endl;
       }
     } else if (command == "record") {
       if (!robot) {
