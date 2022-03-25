@@ -16,6 +16,8 @@ Among others, the [control server](experiments/zmq_control_server.cpp) has the f
 | `disconnect` | Disconnect from the robot |
 | `get_state` | Get the current state of the robot |
 | `error_recovery` | Recover from any errors that may have been encountered in a previous execution |
+| `set_joint_impedance` | Set the joint impedance parameters (list of 7 stiffness values) |
+| `set_collision_behavior` | Set the collision behavior of the robot (list of 7 `lower_torque_thresholds` values, list of 7 `upper_torque_thresholds` values, list of 6 `lower_force_thresholds` values, list of 6 `upper_force_thresholds` values) |
 | `record` | Record [robot states](https://frankaemika.github.io/libfranka/structfranka_1_1RobotState.html) (torques, q, qd, gravity, end-effector wrench, etc.) at high frequency (recordings are saved to JSON files and sent over ZMQ when the recording is stopped) |
 | `retrieve` | Retrieve recorded robot states (torques, q, qd, gravity, end-effector wrench, etc.) from a previous recording based on the JSON log file name |
 | `move_to_q` | Move to joint configuration with a desired speed (based on the `MotionGenerator` provided in the libfranka demos) |
